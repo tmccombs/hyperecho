@@ -2,6 +2,18 @@
 name = "hyperecho"
 version = "0.1.0"
 authors = ["Thayne McCombs <astrothayne@gmail.com>"]
+edition = "2021"
+
+[features]
+default = ["hyper/http1", "hyper/http2"]
 
 [dependencies]
-hyper = "0.9"
+http = "0.2"
+
+[dependencies.hyper]
+version = "0.14"
+features = ["server", "tcp"]
+
+[dependencies.tokio]
+version = "1.19"
+features = ["rt", "macros"]
