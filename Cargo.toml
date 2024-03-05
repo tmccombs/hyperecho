@@ -5,15 +5,22 @@ authors = ["Thayne McCombs <astrothayne@gmail.com>"]
 edition = "2021"
 
 [features]
-default = ["hyper/http1", "hyper/http2"]
+default = ["http1", "http2"]
+http1 = ["hyper/http1", "hyper-util/http1"]
+http2 = ["hyper/http2", "hyper-util/http2"]
 
 [dependencies]
-http = "0.2"
+http = "1.1"
+http-body-util = "0.1"
 
 [dependencies.hyper]
-version = "0.14"
-features = ["server", "tcp"]
+version = "1.2"
+features = ["server"]
+
+[dependencies.hyper-util]
+version = "0.1"
+features = ["server", "tokio"]
 
 [dependencies.tokio]
-version = "1.19"
-features = ["rt", "macros"]
+version = "1.36"
+features = ["rt", "macros", "net"]

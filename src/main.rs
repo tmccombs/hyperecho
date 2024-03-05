@@ -5,54 +5,59 @@ use std::io::{stdout, Write};
 use std::net::SocketAddr;
 
 use http::header::HeaderMap;
-use hyper::body::{HttpBody, Sender};
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Request, Response, Server};
+use http_body_util::BodyExt;
+use hyper::body::{Body, Bytes, Incoming};
+use hyper::service::service_fn;
+use hyper::{Request, Response};
+use hyper_util::rt::TokioIo;
+use hyper_util::server::conn::auto;
+
+use tokio::net::TcpListener;
+
+#[cfg(not(any(feature = "http1", feature = "http2")))]
+const _: () = assert!(false, "Must enable at least one of http1 and http2");
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() {
-    let make_service = make_service_fn(|_conn| async { Ok::<_, Infallible>(service_fn(echo)) });
+async fn main() -> Result<Infallible, std::io::Error> {
     let addr: SocketAddr = ([0, 0, 0, 0], 3000).into();
-    let server = Server::bind(&addr).serve(make_service);
+    let listener = TcpListener::bind(addr).await?;
 
-    if let Err(e) = server.await {
-        eprintln!("server error: {}", e);
-    } else {
-        println!("Listening on port 3000");
+    let builder = auto::Builder::new(hyper_util::rt::TokioExecutor::new());
+
+    loop {
+        let (stream, _) = listener.accept().await?;
+        let io = TokioIo::new(stream);
+        let builder = builder.clone();
+
+        tokio::task::spawn(async move {
+            if let Err(err) = builder.serve_connection(io, service_fn(echo)).await {
+                eprintln!("server error: {:?}", err);
+            }
+        });
     }
 }
 
-async fn echo(mut req: Request<Body>) -> Result<Response<Body>, Infallible> {
+async fn echo(
+    req: Request<Incoming>,
+) -> Result<Response<impl Body<Data = Bytes, Error = hyper::Error>>, Infallible> {
     // print the request line
-    println!("{} {} {:?}\n", req.method(), req.uri(), req.version());
-    print_headers(&req.headers());
-    print!("\n");
+    println!("\n{} {} {:?}\n", req.method(), req.uri(), req.version());
+    print_headers(req.headers());
+    println!();
 
-    let (sender, body) = Body::channel();
-
-    tokio::spawn(async move {
-        if let Err(err) = do_echo(req.body_mut(), sender).await {
-            eprintln!("Error echoing content: {}", err);
+    let body = req.into_body().map_frame(|frame| {
+        let mut out = stdout();
+        if let Some(data) = frame.data_ref() {
+            out.write_all(data).unwrap();
+            out.flush().unwrap();
         }
+        if let Some(trailers) = frame.trailers_ref() {
+            print_headers(trailers);
+        }
+        frame
     });
 
     Ok(Response::new(body))
-}
-
-async fn do_echo(req: &mut Body, mut resp: Sender) -> Result<(), hyper::Error> {
-    let mut out = stdout();
-    while let Some(data) = req.data().await {
-        let data = data?;
-        let _ = out.write_all(&data);
-        resp.send_data(data.clone()).await?;
-    }
-    write!(out, "\n\n").unwrap();
-    out.flush().unwrap();
-    if let Ok(Some(ref trailers)) = req.trailers().await {
-        println!("Trailers:");
-        print_headers(trailers);
-    }
-    Ok(())
 }
 
 fn print_headers(headers: &HeaderMap) {
