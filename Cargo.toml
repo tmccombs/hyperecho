@@ -2,6 +2,8 @@
 name = "hyperecho"
 version = "0.2.0"
 authors = ["Thayne McCombs <astrothayne@gmail.com>"]
+description = "Simple echo server"
+license = "MIT"
 edition = "2021"
 
 [features]
