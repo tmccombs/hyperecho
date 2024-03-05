@@ -1,8 +1,9 @@
 [package]
 name = "hyperecho"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Thayne McCombs <astrothayne@gmail.com>"]
 description = "Simple echo server"
+repository = "https://github.com/tmccombs/hyperecho"
 license = "MIT"
 edition = "2021"
 
